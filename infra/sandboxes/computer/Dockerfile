@@ -3,17 +3,34 @@ COPY apt-security.sh /tmp/apt-security.sh
 RUN /tmp/apt-security.sh && rm -f /tmp/apt-security.sh
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
+    cmake \
+    curl \
+    libgnutls28-dev \
+    libjpeg62-turbo-dev \
+    libpam0g-dev \
+    libpixman-1-dev \
     libx11-dev \
     libxdamage-dev \
     libxext-dev \
     libxfixes-dev \
     libxtst-dev \
+    libxrandr-dev \
     libpng-dev \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY xcapture.c .
 RUN cc -O3 -fPIC -shared -Wall -Wextra -Werror -o librakazo-xcapture.so xcapture.c \
     -lX11 -lXext -lXdamage -lXfixes -lXtst -lpng
+# Bookworm's x0vncserver predates clipboard support. Build only the current
+# server against the same distribution; no viewer or compiler ships at runtime.
+RUN curl -fsSL https://codeload.github.com/TigerVNC/tigervnc/tar.gz/refs/tags/v1.16.2 -o tigervnc.tar.gz \
+  && echo 'b107c0c8b8a962594281690366c24186e95c2ea4a169acbc0076aa62ed01f467  tigervnc.tar.gz' | sha256sum -c - \
+  && tar -xzf tigervnc.tar.gz \
+  && cmake -S tigervnc-1.16.2 -B vnc-build \
+      -DBUILD_VIEWER=OFF -DENABLE_WAYLAND=OFF -DENABLE_H264=OFF \
+      -DENABLE_NLS=OFF -DENABLE_SYSTEMD=OFF \
+  && cmake --build vnc-build --target x0vncserver --parallel "$(nproc)"
 
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 COPY apt-security.sh /tmp/apt-security.sh
@@ -25,7 +42,15 @@ RUN /tmp/apt-security.sh
 ARG BROWSER=chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
-    x11vnc \
+    libgnutls30 \
+    libjpeg62-turbo \
+    libpam0g \
+    libpixman-1-0 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libxtst6 \
+    patch \
     fluxbox \
     xterm \
     xdotool \
@@ -149,6 +174,8 @@ COPY --chmod=755 control.py /usr/local/bin/rakazo-computer-control
 # scrolls; it sends those to older images through its fallback instead.
 LABEL rakazo.control.aimedScroll="1"
 COPY --from=capture-builder /build/librakazo-xcapture.so /usr/local/lib/librakazo-xcapture.so
+COPY --from=capture-builder /build/vnc-build/unix/x0vncserver/x0vncserver /usr/local/bin/x0vncserver
+COPY --from=capture-builder /build/tigervnc-1.16.2/LICENCE.TXT /usr/share/doc/tigervnc/LICENCE.TXT
 COPY --chmod=755 rakazo-browser /usr/local/bin/rakazo-browser
 COPY --chmod=755 rakazo-focus-or-launch /usr/local/bin/rakazo-focus-or-launch
 COPY --chmod=755 rakazo-page-browser /usr/local/bin/rakazo-page-browser
@@ -163,6 +190,9 @@ COPY --chmod=644 fluxbox.apps /etc/rakazo/fluxbox/apps
 COPY --chmod=644 fluxbox.menu /etc/rakazo/fluxbox/menu
 COPY --chmod=644 embed.html /usr/share/novnc/embed.html
 COPY --chmod=644 clipboard-bridge.js /usr/share/novnc/clipboard-bridge.js
+COPY --chmod=644 novnc-clipboard.patch /tmp/novnc-clipboard.patch
+RUN patch --batch --directory=/usr/share/novnc --strip=1 < /tmp/novnc-clipboard.patch \
+  && rm /tmp/novnc-clipboard.patch
 COPY --chmod=644 mobile-keyboard.js /usr/share/novnc/mobile-keyboard.js
 # Login shells source this after Debian's /etc/profile resets PATH. The home
 # volume hides /etc/skel, so ~/.local/bin has to be restored from the image.

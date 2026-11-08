@@ -386,8 +386,8 @@ export function resetDesktopRuntimeCommand(env = DEFAULT_DESKTOP_ENV) {
     `  index=$((display - ${env.displayStart}))`,
     `  bash -eu -c ${shellQuote(stop)} desktop "$index"`,
     "done",
-    // Retire the default image's legacy primary VNC process too.
-    "pkill -f '^([^ ]*/)?x11vnc .* -rfbport 5900( |$)' || true",
+    // Older computer images boot a primary VNC process outside the session sockets.
+    "pkill -f '^([^ ]*/)?x0vncserver .* -rfbport 5900( |$)' || true",
     `rm -f ${TARGETS}/view-* ${TARGETS}/control-* /tmp/rakazo/browser-pid-* /tmp/rakazo/browser-profile-* /tmp/rakazo/browser-launch-*`,
   ].join("\n");
 }
@@ -396,7 +396,7 @@ const TARGETS = "/tmp/rakazo/desktop-targets";
 
 // Menu exec strings run through `/bin/sh -c`, where `#` starts a comment; rgb:a/b/c keeps
 // hex colors intact. infra/sandboxes/computer/fluxbox.menu carries the same entry.
-// selectToClipboard puts selections in CLIPBOARD, which x11vnc forwards to the host.
+// selectToClipboard puts selections in CLIPBOARD, which x0vncserver forwards to the host.
 export const TERMINAL_MENU_COMMAND =
   "xterm -bg rgb:11/11/13 -fg rgb:e8/e8/ea -cr rgb:e8/e8/ea -title Terminal -xrm 'XTerm*selectToClipboard: true'";
 
@@ -407,7 +407,7 @@ function revokeTargetCommand(kind: "view" | "control" | "terminal", display: num
 
 function stopVncCommand(kind: "view" | "control", layout: DesktopLayout) {
   const socketPrefix = `/tmp/rakazo/sockets/${kind}-${layout.displayNumber}-`;
-  const pattern = quoteLayout(`^([^ ]*/)?x11vnc .* -unixsock ${socketPrefix}[^ ]+( |$)`);
+  const pattern = quoteLayout(`^([^ ]*/)?x0vncserver .* -rfbunixpath ${socketPrefix}[^ ]+( |$)`);
   return [
     `pkill -f ${pattern} || true`,
     "sleep 0.1",
@@ -578,12 +578,12 @@ function renderEnsureScreenCommand(
   const socket = `/tmp/rakazo/sockets/view-${layout.displayNumber}-\${desktop_view_token}`;
   const setupView = [
     `mkdir -p ${TARGETS} /tmp/rakazo/sockets`,
-    `if [ ! -S ${socket} ] || ! pgrep -f ${quoteLayout(`^([^ ]*/)?x11vnc .* -unixsock ${socket}( |$)`)} >/dev/null; then`,
+    `if [ ! -S ${socket} ] || ! pgrep -f ${quoteLayout(`^([^ ]*/)?x0vncserver .* -rfbunixpath ${socket}( |$)`)} >/dev/null; then`,
     stopVncCommand("view", layout),
-    `  nohup x11vnc -display ${layout.display} -forever -shared -viewonly -nopw -rfbport 0 -unixsock ${socket} -xkb -ncache 0 8>&- 9>&- </dev/null >${log}-x11vnc.log 2>&1 &`,
+    `  nohup x0vncserver -display ${layout.display} -AlwaysShared -SecurityTypes None -AcceptKeyEvents=0 -AcceptPointerEvents=0 -AcceptCutText=0 -rfbport -1 -rfbunixpath ${socket} 8>&- 9>&- </dev/null >${log}-x0vncserver.log 2>&1 &`,
     "fi",
     `for i in $(seq 1 50); do [ -S ${socket} ] && break; sleep 0.1; done`,
-    `if [ ! -S ${socket} ]; then echo 'screen viewer did not start' >&2; tail -c 2000 ${log}-x11vnc.log >&2 || true; exit 1; fi`,
+    `if [ ! -S ${socket} ]; then echo 'screen viewer did not start' >&2; tail -c 2000 ${log}-x0vncserver.log >&2 || true; exit 1; fi`,
     // Leave an unchanged mapping in place. Replacing it on every ensure races
     // TokenFile, which reloads the directory on each handshake.
     `desired=$(printf '%s: unix_socket:%s\\n' "$desktop_view_token" ${socket})`,
@@ -668,13 +668,13 @@ export function interactiveScreenCommand(
   }
   if (!controlToken) throw new Error("interactive screen requires a control token");
   const socket = `/tmp/rakazo/sockets/control-${layout.displayNumber}-${browserKeyForScreen(controlToken)}`;
-  const process = quoteLayout(`^([^ ]*/)?x11vnc .* -unixsock ${socket}( |$)`);
+  const process = quoteLayout(`^([^ ]*/)?x0vncserver .* -rfbunixpath ${socket}( |$)`);
   return [
     "set -eu",
     `if ! { [ -f ${tokenFile} ] && [ "$(cat ${tokenFile})" = ${shellQuote(controlToken)} ] && [ -S ${socket} ] && pgrep -f ${process} >/dev/null; }; then`,
     stopProcesses,
     `mkdir -p ${TARGETS} /tmp/rakazo/sockets`,
-    `nohup x11vnc -display ${layout.display} -forever -shared -nopw -rfbport 0 -unixsock ${socket} -xkb -ncache 0 8>&- 9>&- </dev/null >/tmp/rakazo/x11vnc-control-${layout.displayNumber}.log 2>&1 &`,
+    `nohup x0vncserver -display ${layout.display} -AlwaysShared -SecurityTypes None -rfbport -1 -rfbunixpath ${socket} 8>&- 9>&- </dev/null >/tmp/rakazo/x0vncserver-control-${layout.displayNumber}.log 2>&1 &`,
     `for i in $(seq 1 50); do [ -S ${socket} ] && pgrep -f ${process} >/dev/null && break; sleep 0.1; done`,
     `[ -S ${socket} ] && pgrep -f ${process} >/dev/null || exit 1`,
     `printf %s ${shellQuote(controlToken)} >${tokenFile}`,

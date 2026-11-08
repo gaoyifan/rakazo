@@ -44,6 +44,7 @@ export const COMPUTER_IMAGE_CONTEXT_FILES = [
   "browser-policy.json",
   "embed.html",
   "clipboard-bridge.js",
+  "novnc-clipboard.patch",
   "mobile-keyboard.js",
   "fluxbox.init",
   "fluxbox.apps",

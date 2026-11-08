@@ -1240,7 +1240,7 @@ describe("screen release status", () => {
         inspect: async () => ({
           ExitCode:
             failControl &&
-            options.Cmd?.join(" ").includes("nohup x11vnc -display :1 -forever -shared -nopw")
+            options.Cmd?.join(" ").includes("nohup x0vncserver -display :1 -AlwaysShared -SecurityTypes None -rfbport -1")
               ? 1
               : 0,
         }),
@@ -1266,7 +1266,7 @@ describe("screen release status", () => {
     expect((await open(false)).status).toBe(200);
     expect(
       container.exec.mock.calls.map(([options]) => options.Cmd.join(" ")).join("\n"),
-    ).toContain("nohup x11vnc -display :1 -forever -shared -nopw");
+    ).toContain("nohup x0vncserver -display :1 -AlwaysShared -SecurityTypes None -rfbport -1");
     failControl = true;
     const failed = await open(false);
     expect(failed.status).toBe(400);
