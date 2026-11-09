@@ -692,13 +692,10 @@ describe("sandbox supervisor input containment", () => {
   });
 
   it("keeps the viewer read-only and uses a separate process for takeover control", () => {
-    expect(ensureScreenCommand(0, "bot", "view-token")).toMatch(
-      /x0vncserver .* -AcceptKeyEvents=0 -AcceptPointerEvents=0 -AcceptCutText=0 /,
-    );
     expect(interactiveScreenCommand(false)).toMatch(/pkill .*sockets\/control-1-/);
-    expect(interactiveScreenCommand(false)).not.toMatch(/x0vncserver -display/);
+    expect(interactiveScreenCommand(false)).not.toMatch(/x11vnc -display/);
     expect(interactiveScreenCommand(true, "lease-new")).toMatch(
-      /x0vncserver -display .* -rfbport -1 -rfbunixpath .*control-1-/,
+      /x11vnc -display .* -rfbport 0 -unixsock .*control-1-/,
     );
     expect(interactiveScreenCommand(true, "lease-new")).toMatch(/6080/);
     expect(interactiveScreenCommand(true, "lease-new")).toContain("0.0.0.0:6080 8>&-");

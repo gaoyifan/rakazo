@@ -34,12 +34,11 @@ it.skipIf(process.env.VERIFY_DOCKER_TEAM_SCREENS !== "1").each([false, true])(
       const env = managed
         ? {
             ...DEFAULT_DESKTOP_ENV,
-            bindHost: "0.0.0.0",
             preservePrimaryDisplay: false,
             displayStart: 20,
             portStart: 6100,
           }
-        : { ...DEFAULT_DESKTOP_ENV, bindHost: "0.0.0.0" };
+        : DEFAULT_DESKTOP_ENV;
       const commands: Record<string, string> = {
         reset: resetManagedScreensCommand(),
         seed: managed

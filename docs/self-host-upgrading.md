@@ -41,15 +41,6 @@ Source checkouts (not Compose) still upgrade the old way: pull, rebuild with
 `GIT_SHA=$(git rev-parse HEAD)`, run `pnpm db:migrate`, then restart API and worker.
 Product contracts stay compatible across cloud and self-hosted.
 
-## UTF-8 clipboard in Docker computers
-
-Docker computers use TigerVNC's `x0vncserver` and Extended Clipboard for Unicode
-plain text, including CJK and emoji. Paste waits for the text payload before
-sending Ctrl+V, and view sessions reject clipboard writes and keyboard/pointer
-input on the server. Update existing computers with their computer update action
-after deploying this version; changing the default image affects new computers
-only. Updating a computer retains its saved home files.
-
 ## Upgrading to the separate app database login
 
 Releases with [database roles](./self-host-configuration.md#database-roles) need `POSTGRES_APP_PASSWORD` in `.env`. The

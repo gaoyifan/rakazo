@@ -35,11 +35,7 @@ describe("host clipboard paste bridge", () => {
       },
     };
     attachHostClipboardPaste(
-      {
-        viewOnly: false,
-        clipboardPasteFrom: vi.fn((_text: string, onSent?: () => void) => onSent?.()),
-        sendKey: vi.fn(),
-      },
+      { viewOnly: false, clipboardPasteFrom: vi.fn(), sendKey: vi.fn() },
       { target },
     );
     const stopPropagation = vi.fn();
@@ -104,13 +100,13 @@ describe("host clipboard paste bridge", () => {
     const rfb = {
       viewOnly: false,
       _rfbConnectionState: "connected",
-      clipboardPasteFrom: vi.fn((_text: string, onSent?: () => void) => onSent?.()),
+      clipboardPasteFrom: vi.fn(),
       sendKey: (keysym: number, code: string, down?: boolean) => {
         keys.push([keysym, code, down]);
       },
     };
     expect(pasteHostText(rfb, "agent-password")).toBe(true);
-    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("agent-password", expect.any(Function));
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("agent-password");
     expect(keys[0]).toEqual([0xffe3, "ControlLeft", false]);
     expect(keys).toContainEqual([0xffe9, "AltLeft", false]);
     expect(keys.at(-4)).toEqual([0xffe3, "ControlLeft", true]);
@@ -134,7 +130,7 @@ describe("host clipboard paste bridge", () => {
     const rfb = {
       viewOnly: false,
       _rfbConnectionState: "connecting",
-      clipboardPasteFrom: vi.fn((_text: string, onSent?: () => void) => onSent?.()),
+      clipboardPasteFrom: vi.fn(),
       sendKey: vi.fn(),
     };
     attachHostClipboardPaste(rfb, { target });
@@ -165,7 +161,7 @@ describe("host clipboard paste bridge", () => {
     const rfb = {
       viewOnly: false,
       _rfbConnectionState: "connected",
-      clipboardPasteFrom: vi.fn((_text: string, onSent?: () => void) => onSent?.()),
+      clipboardPasteFrom: vi.fn(),
       sendKey: vi.fn(),
     };
     const detach = attachHostClipboardPaste(rfb, { target });
@@ -198,7 +194,7 @@ describe("host clipboard paste bridge", () => {
     });
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(pasteStop).toHaveBeenCalledOnce();
-    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-host", expect.any(Function));
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-host");
     expect(rfb.sendKey).toHaveBeenCalled();
 
     detach();
@@ -225,7 +221,7 @@ describe("mobile paste control", () => {
   const connectedRfb = () => ({
     viewOnly: false,
     _rfbConnectionState: "connected",
-    clipboardPasteFrom: vi.fn((_text: string, onSent?: () => void) => onSent?.()),
+    clipboardPasteFrom: vi.fn(),
     sendKey: vi.fn(),
   });
 
@@ -275,7 +271,7 @@ describe("mobile paste control", () => {
     });
     expect(button.hidden).toBe(false);
     await listeners.get("click")?.({});
-    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-phone", expect.any(Function));
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-phone");
     expect(fallbackFocus.blur).toHaveBeenCalledOnce();
     detach();
     expect(listeners.size).toBe(0);
@@ -302,7 +298,7 @@ describe("mobile paste control", () => {
     expect(rfb.clipboardPasteFrom).not.toHaveBeenCalled();
     settle?.("from-phone");
     await pending;
-    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-phone", expect.any(Function));
+    expect(rfb.clipboardPasteFrom).toHaveBeenCalledWith("from-phone");
     expect(fallbackFocus.blur).toHaveBeenCalledOnce();
   });
 
@@ -387,59 +383,4 @@ describe("remote clipboard copy", () => {
     // Let the rejection settle; it must not surface as unhandled.
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("secret"));
   });
-});
-
-function connection() {
-  const sent: string[] = [];
-  const callbacks: Array<() => void> = [];
-  const rfb = {
-    viewOnly: false,
-    _rfbConnectionState: "connected",
-    clipboardPasteFrom(text: string, onSent?: () => void) {
-      sent.push(text);
-      if (onSent) callbacks.push(onSent);
-    },
-    sendKey(_keysym: number, code: string, down?: boolean) {
-      if (code === "KeyV" && down) sent.push("Ctrl+V");
-    },
-  };
-  return { rfb, sent, callbacks };
-}
-
-it("pastes only after the Unicode clipboard payload has been sent", () => {
-  const { rfb, sent, callbacks } = connection();
-  expect(pasteHostText(rfb, "咖啡中文🙂")).toBe(true);
-  expect(sent).toEqual(["咖啡中文🙂"]);
-  callbacks.shift()!();
-  expect(sent).toEqual(["咖啡中文🙂", "Ctrl+V"]);
-});
-
-it("keeps consecutive paste payloads in order", () => {
-  const { rfb, sent, callbacks } = connection();
-  pasteHostText(rfb, "第一段");
-  pasteHostText(rfb, "second ☕");
-  expect(sent).toEqual(["第一段"]);
-  callbacks.shift()!();
-  expect(sent).toEqual(["第一段", "Ctrl+V", "second ☕"]);
-  callbacks.shift()!();
-  expect(sent).toEqual(["第一段", "Ctrl+V", "second ☕", "Ctrl+V"]);
-});
-
-it("stops pending pastes when control is lost or the connection closes", () => {
-  for (const revoke of [
-    (rfb: ReturnType<typeof connection>["rfb"]) => {
-      rfb.viewOnly = true;
-    },
-    (rfb: ReturnType<typeof connection>["rfb"]) => {
-      rfb._rfbConnectionState = "disconnected";
-    },
-  ]) {
-    const { rfb, sent, callbacks } = connection();
-    pasteHostText(rfb, "first");
-    pasteHostText(rfb, "second");
-    revoke(rfb);
-    callbacks.shift()!();
-    expect(sent).toEqual(["first"]);
-    expect(pasteHostText(rfb, "third")).toBe(false);
-  }
 });

@@ -50,7 +50,7 @@ type EventTargetLike = {
 export function pasteHostText(
   rfb: {
     viewOnly?: boolean;
-    clipboardPasteFrom?: (text: string, onSent?: () => void) => void;
+    clipboardPasteFrom?: (text: string) => void;
     sendKey?: (keysym: number, code: string, down?: boolean) => void;
     _rfbConnectionState?: string;
   },
@@ -73,7 +73,7 @@ type PasteTargetLike = {
 export function attachMobilePaste(
   rfb: {
     viewOnly?: boolean;
-    clipboardPasteFrom?: (text: string, onSent?: () => void) => void;
+    clipboardPasteFrom?: (text: string) => void;
     sendKey?: (keysym: number, code: string, down?: boolean) => void;
     _rfbConnectionState?: string;
   },
@@ -94,7 +94,7 @@ export function attachRemoteClipboardCopy(
 export function attachHostClipboardPaste(
   rfb: {
     viewOnly?: boolean;
-    clipboardPasteFrom?: (text: string, onSent?: () => void) => void;
+    clipboardPasteFrom?: (text: string) => void;
     sendKey?: (keysym: number, code: string, down?: boolean) => void;
     _rfbConnectionState?: string;
   },

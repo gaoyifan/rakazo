@@ -66,38 +66,18 @@ export function sendRemotePaste(sendKey) {
   sendKey(KEYSYM.Control_L, "ControlLeft", false);
 }
 
-const pendingPastes = new WeakMap();
-
 /**
  * Sync host paste into the RFB session, then paste into the remote desktop.
- * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string, onSent: () => void) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
+ * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
  * @param {string} text
  */
 export function pasteHostText(rfb, text) {
   if (!rfb || rfb.viewOnly || !text || !isRfbConnected(rfb)) return false;
   const sendKey = rfb.sendKey?.bind(rfb);
   if (!sendKey || typeof rfb.clipboardPasteFrom !== "function") return false;
-  // Extended Clipboard requests the text asynchronously. Send Ctrl+V only
-  // after Provide, and keep overlapping pastes from replacing pending text.
-  const queue = pendingPastes.get(rfb) ?? [];
-  pendingPastes.set(rfb, queue);
-  const complete = () => {
-    queue.shift();
-    if (queue.length) queue[0]();
-    else pendingPastes.delete(rfb);
-  };
-  queue.push(() => {
-    if (rfb.viewOnly || !isRfbConnected(rfb)) {
-      complete();
-      return;
-    }
-    releaseModifierKeys(sendKey);
-    rfb.clipboardPasteFrom(text, () => {
-      if (!rfb.viewOnly && isRfbConnected(rfb)) sendRemotePaste(sendKey);
-      complete();
-    });
-  });
-  if (queue.length === 1) queue[0]();
+  releaseModifierKeys(sendKey);
+  rfb.clipboardPasteFrom(text);
+  sendRemotePaste(sendKey);
   return true;
 }
 
@@ -133,7 +113,7 @@ function focusPasteTarget(target) {
  * Touch Paste control: one tap reads the host clipboard and pastes through the
  * RFB bridge. When the clipboard API is unavailable, focus a paste target so
  * the existing `paste` listener can fire without a modifier chord.
- * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string, onSent: () => void) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
+ * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
  * @param {{ button?: HTMLElement | null, clipboard?: { readText?: () => Promise<string> }, fallbackFocus?: { focus?: () => void, blur?: () => void, value?: string, setSelectionRange?: (start: number, end: number) => void } | null }} [options]
  * @returns {() => void} detach
  */
@@ -163,7 +143,7 @@ export function attachMobilePaste(rfb, options = {}) {
 
 /**
  * Sandbox → host copy: Debian noVNC 1.3 dispatches a "clipboard" CustomEvent
- * with detail.text when the VNC server reports a remote CLIPBOARD change
+ * with detail.text when x11vnc reports a remote CLIPBOARD change
  * (ServerCutText). navigator.clipboard.writeText needs a secure context and
  * can be denied without a gesture, so failures are silent.
  * @param {{ addEventListener?: (type: string, listener: (event: object) => void) => void, removeEventListener?: (type: string, listener: (event: object) => void) => void } | null | undefined} rfb
@@ -190,7 +170,7 @@ export function attachRemoteClipboardCopy(rfb, options = {}) {
 }
 
 /**
- * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string, onSent: () => void) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
+ * @param {{ viewOnly?: boolean, clipboardPasteFrom?: (text: string) => void, sendKey?: Function, _rfbConnectionState?: string }} rfb
  * @param {{ target?: EventTarget }} [options]
  * @returns {() => void} detach
  */

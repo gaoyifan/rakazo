@@ -491,7 +491,7 @@ describe("shared Linux desktop lifecycle", () => {
     expect(
       patterns.some((pattern) =>
         pattern.test(
-          "/usr/bin/x0vncserver -display :21 -rfbport -1 -rfbunixpath /tmp/rakazo/sockets/view-21-token -AlwaysShared",
+          "/usr/bin/x11vnc -display :21 -rfbport 0 -unixsock /tmp/rakazo/sockets/view-21-token -forever",
         ),
       ),
     ).toBe(true);
